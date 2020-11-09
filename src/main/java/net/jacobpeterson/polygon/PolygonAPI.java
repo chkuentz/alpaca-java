@@ -3,6 +3,7 @@ package net.jacobpeterson.polygon;
 import com.google.common.base.Preconditions;
 import com.google.gson.reflect.TypeToken;
 import com.mashape.unirest.http.HttpResponse;
+import net.jacobpeterson.abstracts.websocket.exception.WebsocketException;
 import net.jacobpeterson.domain.polygon.aggregates.AggregatesResponse;
 import net.jacobpeterson.domain.polygon.conditionsmapping.ConditionsMapping;
 import net.jacobpeterson.domain.polygon.dailyopenclose.DailyOpenCloseResponse;
@@ -53,30 +54,30 @@ import java.util.ArrayList;
 import java.util.StringJoiner;
 
 /**
- * The Class PolygonAPI.
+ * The class PolygonAPI. Note that most of these methods are blocking methods and this class in NOT thread-safe.
  */
 public class PolygonAPI {
 
     /** The logger. */
-    private static Logger LOGGER = LogManager.getLogger(PolygonAPI.class);
+    private static final Logger LOGGER = LogManager.getLogger(PolygonAPI.class);
 
-    /** The Polygon websocket client. */
+    /** The PolygonWebsocketClient. */
     private final PolygonWebsocketClient polygonWebsocketClient;
 
     /** The polygon request. */
     private final PolygonRequest polygonRequest;
 
-    /** The base api url. */
-    private String baseAPIURL;
+    /** The base API URL. */
+    private final String baseAPIURL;
 
-    /** The Websocket url. */
-    private String websocketURL;
+    /** The Websocket URL. */
+    private final String websocketURL;
 
-    /** The Key id. */
-    private String keyID;
+    /** The Key ID. */
+    private final String keyID;
 
     /**
-     * Instantiates a new polygon API.
+     * Instantiates a new PolygonAPI.
      */
     public PolygonAPI() {
         this(PolygonProperties.KEY_ID_VALUE);
@@ -85,20 +86,20 @@ public class PolygonAPI {
     }
 
     /**
-     * Instantiates a new polygon API.
+     * Instantiates a new PolygonAPI.
      *
-     * @param keyId the key id
+     * @param keyID the key ID
      */
-    public PolygonAPI(String keyId) {
-        this(PolygonProperties.BASE_API_URL_VALUE, PolygonProperties.POLYGON_WEB_SOCKET_SERVER_URL_VALUE, keyId);
+    public PolygonAPI(String keyID) {
+        this(PolygonProperties.BASE_API_URL_VALUE, PolygonProperties.POLYGON_WEB_SOCKET_SERVER_URL_VALUE, keyID);
     }
 
     /**
      * Instantiates a new polygon API.
      *
-     * @param baseAPIURL   the base api url
-     * @param websocketURL the websocket url
-     * @param keyID        the key id
+     * @param baseAPIURL   the base API URL
+     * @param websocketURL the websocket URL
+     * @param keyID        the key ID
      */
     public PolygonAPI(String baseAPIURL, String websocketURL, String keyID) {
         this.baseAPIURL = baseAPIURL;
@@ -129,7 +130,7 @@ public class PolygonAPI {
      * @see <a href="https://polygon.io/docs/#!/Reference/get_v2_reference_tickers">Tickers</a>
      */
     public TickersResponse getTickers(TickerSort tickerSort, StockType stockType, Market market, String locale,
-                                      String search, Integer perpage, Integer page, Boolean active) throws PolygonAPIRequestException {
+            String search, Integer perpage, Integer page, Boolean active) throws PolygonAPIRequestException {
         PolygonRequestBuilder builder = new PolygonRequestBuilder(baseAPIURL, PolygonConstants.VERSION_2_ENDPOINT,
                 PolygonConstants.REFERENCE_ENDPOINT,
                 PolygonConstants.TICKERS_ENDPOINT);
@@ -377,7 +378,7 @@ public class PolygonAPI {
      * @see <a href="https://polygon.io/docs/#!/Reference/get_v2_reference_financials_symbol">Stock Financials</a>
      */
     public StockFinancialsResponse getStockFinancials(String symbol, Integer limit,
-                                                      FinancialReportType financialReportType, FinancialSort financialSort) throws PolygonAPIRequestException {
+            FinancialReportType financialReportType, FinancialSort financialSort) throws PolygonAPIRequestException {
         Preconditions.checkNotNull(symbol);
 
         PolygonRequestBuilder builder = new PolygonRequestBuilder(baseAPIURL, PolygonConstants.VERSION_2_ENDPOINT,
@@ -879,7 +880,7 @@ public class PolygonAPI {
      * <a href="https://polygon.io/docs/#!/Stocks--Equities/get_v2_aggs_ticker_ticker_range_multiplier_timespan_from_to">Aggregates</a>
      */
     public AggregatesResponse getAggregates(String ticker, Integer multiplier, Timespan timeSpan, LocalDate fromDate,
-                                            LocalDate toDate, Boolean unadjusted) throws PolygonAPIRequestException {
+            LocalDate toDate, Boolean unadjusted) throws PolygonAPIRequestException {
         Preconditions.checkNotNull(ticker);
         Preconditions.checkNotNull(timeSpan);
         Preconditions.checkNotNull(fromDate);
@@ -955,8 +956,10 @@ public class PolygonAPI {
      * Adds the polygon stream listener.
      *
      * @param streamListener the stream listener
+     *
+     * @throws WebsocketException the WebsocketException
      */
-    public void addPolygonStreamListener(PolygonStreamListener streamListener) {
+    public void addPolygonStreamListener(PolygonStreamListener streamListener) throws WebsocketException {
         polygonWebsocketClient.addListener(streamListener);
     }
 
@@ -964,8 +967,10 @@ public class PolygonAPI {
      * Removes the polygon stream listener.
      *
      * @param streamListener the stream listener
+     *
+     * @throws WebsocketException the WebsocketException
      */
-    public void removePolygonStreamListener(PolygonStreamListener streamListener) {
+    public void removePolygonStreamListener(PolygonStreamListener streamListener) throws WebsocketException {
         polygonWebsocketClient.removeListener(streamListener);
     }
 

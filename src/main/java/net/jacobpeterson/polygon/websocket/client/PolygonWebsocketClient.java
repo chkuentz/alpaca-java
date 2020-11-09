@@ -7,6 +7,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSyntaxException;
 import net.jacobpeterson.abstracts.websocket.client.WebsocketClient;
+import net.jacobpeterson.abstracts.websocket.exception.WebsocketException;
 import net.jacobpeterson.abstracts.websocket.listener.StreamListener;
 import net.jacobpeterson.abstracts.websocket.message.StreamMessage;
 import net.jacobpeterson.abstracts.websocket.message.StreamMessageType;
@@ -50,13 +51,13 @@ public class PolygonWebsocketClient implements WebsocketClient {
     private static final String EVENT_TYPE_KEY = "ev";
 
     /** The key id. */
-    private String keyId;
+    private final String keyId;
 
     /** The Websocket url. */
-    private String websocketURL;
+    private final String websocketURL;
 
     /** The listeners. */
-    private List<PolygonStreamListener> listeners;
+    private final List<PolygonStreamListener> listeners;
 
     /** The client end point. */
     private PolygonWebsocketClientEndpoint polygonWebsocketClientEndpoint;
@@ -78,11 +79,15 @@ public class PolygonWebsocketClient implements WebsocketClient {
     }
 
     @Override
-    public void addListener(StreamListener listener) {
+    public void addListener(StreamListener<?, ?> listener) throws WebsocketException {
         Preconditions.checkState(listener instanceof PolygonStreamListener);
 
         if (listeners.isEmpty()) {
-            connect();
+            try {
+                connect();
+            } catch (IOException | URISyntaxException | DeploymentException exception) {
+                throw new WebsocketException(exception);
+            }
         }
 
         listeners.add((PolygonStreamListener) listener);
@@ -91,43 +96,40 @@ public class PolygonWebsocketClient implements WebsocketClient {
     }
 
     @Override
-    public void removeListener(StreamListener listener) {
+    public void removeListener(StreamListener<?, ?> listener) throws WebsocketException {
         Preconditions.checkState(listener instanceof PolygonStreamListener);
 
         listeners.remove(listener);
 
-        submitStreamRequest(PolygonStreamAction.UNSUBSCRIBE, (PolygonStreamListener) listener);
-
         if (listeners.isEmpty()) {
-            disconnect();
+            try {
+                disconnect();
+            } catch (Exception exception) {
+                throw new WebsocketException(exception);
+            }
+        } else {
+            submitStreamRequest(PolygonStreamAction.UNSUBSCRIBE, (PolygonStreamListener) listener);
         }
     }
 
     @Override
-    public void connect() {
+    public void connect() throws URISyntaxException, IOException, DeploymentException {
         LOGGER.info("Connecting...");
 
-        try {
-            polygonWebsocketClientEndpoint = new PolygonWebsocketClientEndpoint(this, new URI(websocketURL));
-            polygonWebsocketClientEndpoint.connect();
+        polygonWebsocketClientEndpoint = new PolygonWebsocketClientEndpoint(this, new URI(websocketURL));
+        polygonWebsocketClientEndpoint.setAutomaticallyReconnect(true);
+        polygonWebsocketClientEndpoint.connect();
 
-            LOGGER.info("Connected.");
-        } catch (URISyntaxException | DeploymentException | IOException e) {
-            LOGGER.throwing(e);
-        }
+        LOGGER.info("Connected.");
     }
 
     @Override
-    public void disconnect() {
+    public void disconnect() throws Exception {
         LOGGER.info("Disconnecting...");
 
-        try {
-            polygonWebsocketClientEndpoint.getUserSession().close();
+        polygonWebsocketClientEndpoint.disconnect();
 
-            LOGGER.info("Disconnected.");
-        } catch (IOException e) {
-            LOGGER.throwing(e);
-        }
+        LOGGER.info("Disconnected.");
     }
 
     @Override
@@ -139,6 +141,12 @@ public class PolygonWebsocketClient implements WebsocketClient {
         authRequest.addProperty("params", keyId);
 
         polygonWebsocketClientEndpoint.sendMessage(authRequest.toString());
+    }
+
+    @Override
+    public void handleResubscribing() {
+        listeners.forEach(polygonStreamListener ->
+                submitStreamRequest(PolygonStreamAction.SUBSCRIBE, polygonStreamListener));
     }
 
     @Override
@@ -183,13 +191,13 @@ public class PolygonWebsocketClient implements WebsocketClient {
                                     GsonUtil.GSON.fromJson(messageJsonObject, AggregatePerMinuteMessage.class));
                             break;
                         default:
-                            LOGGER.error("Unknown stream object: " + messageJsonObject);
+                            LOGGER.error("Unknown stream object: {}", messageJsonObject);
                     }
                 } catch (JsonSyntaxException e) {
                     LOGGER.throwing(e);
                 }
             } else {
-                LOGGER.error("Unknown stream message: " + messageJsonObject);
+                LOGGER.error("Unknown stream message: {}", messageJsonObject);
             }
         }
     }
@@ -202,7 +210,7 @@ public class PolygonWebsocketClient implements WebsocketClient {
         PolygonStreamMessageType polygonStreamMessageType = (PolygonStreamMessageType) streamMessageType;
         PolygonStreamMessage polygonStreamMessage = (PolygonStreamMessage) streamMessage;
 
-        for (PolygonStreamListener streamListener : listeners) {
+        for (PolygonStreamListener streamListener : new ArrayList<>(listeners)) {
             boolean sendToStreamListener = false;
 
             if (streamListener.getStockChannels().containsKey(polygonStreamMessage.getSym())) {
@@ -274,20 +282,18 @@ public class PolygonWebsocketClient implements WebsocketClient {
 
                     if (isTickerChannelRegistered) {
                         if (polygonStreamAction == PolygonStreamAction.UNSUBSCRIBE) {
-                            LOGGER.warn("Cannot unsubscribe from " + ticker + " for channel " +
-                                    listenerChannelType.name() +
-                                    " because it is being used by another stream listener!");
+                            LOGGER.warn("Cannot unsubscribe from {} for channel {} because it is being used by " +
+                                    "another stream listener!", ticker, listenerChannelType.name());
                         } else if (polygonStreamAction == PolygonStreamAction.SUBSCRIBE) {
-                            LOGGER.warn("Already subscribed to " + ticker + " for channel " +
-                                    listenerChannelType.name() + "!");
+                            LOGGER.warn("Already subscribed to {} for channel {}", ticker, listenerChannelType.name());
                         }
                     } else { // Not a registered channel by other stream listeners
                         actionTickerList.add(formattedWebsocketTicker);
 
                         if (polygonStreamAction == PolygonStreamAction.UNSUBSCRIBE) {
-                            LOGGER.info(("Unsubscribing from " + formattedWebsocketTicker));
+                            LOGGER.info("Unsubscribing from {}", formattedWebsocketTicker);
                         } else if (polygonStreamAction == PolygonStreamAction.SUBSCRIBE) {
-                            LOGGER.info(("Subscribing to " + formattedWebsocketTicker));
+                            LOGGER.info("Subscribing to {}", formattedWebsocketTicker);
                         }
                     }
                 }
@@ -302,9 +308,9 @@ public class PolygonWebsocketClient implements WebsocketClient {
                     actionTickerList.add(formattedWebsocketTicker);
 
                     if (polygonStreamAction == PolygonStreamAction.UNSUBSCRIBE) {
-                        LOGGER.info(("Unsubscribing from " + formattedWebsocketTicker));
+                        LOGGER.info("Unsubscribing from: {}", formattedWebsocketTicker);
                     } else if (polygonStreamAction == PolygonStreamAction.SUBSCRIBE) {
-                        LOGGER.info(("Subscribing to " + formattedWebsocketTicker));
+                        LOGGER.info("Subscribing to:  {}", formattedWebsocketTicker);
                     }
                 }
             }
@@ -324,7 +330,7 @@ public class PolygonWebsocketClient implements WebsocketClient {
 
             polygonWebsocketClientEndpoint.sendMessage(actionJsonObject.toString());
 
-            LOGGER.info(("Requested subscriptions to update to " + getRegisteredTickerChannels(null)));
+            LOGGER.info("Requested subscriptions to update for: {}", getRegisteredTickerChannels(null));
         }
     }
 
@@ -350,7 +356,7 @@ public class PolygonWebsocketClient implements WebsocketClient {
     private Map<String, Set<PolygonStreamMessageType>> getRegisteredTickerChannels(PolygonStreamListener exclude) {
         HashMap<String, Set<PolygonStreamMessageType>> registeredTickerChannels = new HashMap<>();
 
-        for (PolygonStreamListener streamListener : listeners) {
+        for (PolygonStreamListener streamListener : new ArrayList<>(listeners)) {
             if (streamListener.equals(exclude)) {
                 continue;
             }
