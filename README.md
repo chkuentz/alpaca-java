@@ -5,7 +5,7 @@
 </p>
 
 ## Overview
-This is a Java implementation for <a href="https://alpaca.markets/">Alpaca</a>. Alpaca  lets you build and trade with real-time market data for free. This library is community developed and if you have any questions, please ask them on the [Alpaca Slack #dev-alpaca-java channel](https://alpaca.markets/slack) or on the [Alpaca Forums](https://forum.alpaca.markets/).
+This is a Java implementation for the <a href="https://alpaca.markets/">Alpaca</a> API. Alpaca lets you build and trade with real-time market data for free. This library is community developed and if you have any questions, please ask them on [Github Discussions](https://github.com/Petersoj/alpaca-java/discussions), the [Alpaca Slack #dev-alpaca-java channel](https://alpaca.markets/slack), or on the [Alpaca Forums](https://forum.alpaca.markets/).
 
 ## Table of Contents
 1. [Building](#building)
@@ -36,7 +36,7 @@ Add the following dependency to your build.gradle file:
 
 ```
 dependencies {
-    compile "net.jacobpeterson:alpaca-java:6.0"
+    compile "net.jacobpeterson:alpaca-java:6.0.1"
 }
 ```
 
@@ -48,7 +48,7 @@ Add the following dependency to your pom.xml file:
 <dependency>
     <groupId>net.jacobpeterson</groupId>
     <artifactId>alpaca-java</artifactId>
-    <version>6.0</version>
+    <version>6.0.1</version>
     <scope>compile</scope>
 </dependency>
 ```
@@ -65,20 +65,22 @@ that you use in your trading algorithm projects is indeed legitimate, we need to
 with the Jar MD5 checksum from this source code:
 1. Clone the repo somewhere: `git clone https://github.com/Petersoj/alpaca-java`
 2. `cd alpaca-java`
-3. Checkout/reset to the latest version: `git reset 6.0 --hard`
+3. Checkout/reset to the latest version: `git reset 6.0.1 --hard`
 4. Build the project: `./gradlew build`
-    1. Note: if you build the project twice without a `clean` task in between (e.g. `./gradlew build; ./gradlew build`), the MD5 checksum will change.
-5. Generate the MD5 checksum: `md5 build/libs/alpaca-java-6.0.jar`
+    1. If you build the project twice without a `clean` task in between (e.g. `./gradlew build; ./gradlew build`), the MD5 checksum will change.
+    2. Use Java 8 (JDK 1.8) to build, otherwise the MD5 checksums will differ.
+5. Generate the MD5 checksum: `md5 build/libs/alpaca-java-6.0.1.jar`
 6. Confirm that the checksum value in Maven Central is the same as in step 4:
-`curl https://repo1.maven.org/maven2/net/jacobpeterson/alpaca-java/6.0/alpaca-java-6.0.jar.md5`
+`curl https://repo1.maven.org/maven2/net/jacobpeterson/alpaca-java/6.0.1/alpaca-java-6.0.1.jar.md5`
 
 If the checksums are different, please [create a new issue](https://github.com/Petersoj/alpaca-java/issues/new)!
+The current MD5 checksum of build `6.0.1` is: `425532e598e3d812b29a3270cf4c5e73`
 
 ## Configuration
 
-If you plan on using the alpaca.properties, set the following properties in an alpaca.properties file on the classpath:
+Creating an `alpaca.properties` file on the classpath of the following format allows you to easily load various properties
+using the `AlpacaAPI()` default constructor:
 ```
-api_version = <v1 or v2>
 key_id = <YOUR KEY>
 secret = <YOUR SECRET>
 base_api_url = https://paper-api.alpaca.markets
@@ -87,10 +89,10 @@ user_agent=a_user_agent
 ```
 The default values for `alpaca.properties` can be found [here](https://github.com/Petersoj/alpaca-java/tree/master/src/main/resources).
 
-Similarly, set the following properties in a polygon.properties file on the classpath for using the PolygonAPI:
+Similarly, creating a `polygon.properties` file on the classpath of the following format allows you to easily load various properties
+using the `PolygonAPI()` default constructor:
 ```
-#key_id will default to what is set in alpaca.properties
-key_id = <INSERT HERE>
+key_id = <YOUR KEY> (Note that this will default to what is set in alpaca.properties)
 base_api_url = https://api.polygon.io
 web_socket_server_url = wss://alpaca.socket.polygon.io/stocks
 user_agent=a_user_agent
