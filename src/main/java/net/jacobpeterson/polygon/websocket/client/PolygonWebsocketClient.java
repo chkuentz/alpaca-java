@@ -145,8 +145,25 @@ public class PolygonWebsocketClient implements WebsocketClient {
 
     @Override
     public void handleResubscribing() {
-        listeners.forEach(polygonStreamListener ->
-                submitStreamRequest(PolygonStreamAction.SUBSCRIBE, polygonStreamListener));
+        ArrayList<PolygonStreamListener> listenersCopy = new ArrayList<>(listeners);
+
+        listenersCopy.forEach(polygonStreamListener ->
+        {
+            try {
+                removeListener(polygonStreamListener);
+            } catch (WebsocketException e) {
+                e.printStackTrace();
+            }
+        });
+
+        listenersCopy.forEach(polygonStreamListener ->
+        {
+            try {
+                addListener(polygonStreamListener);
+            } catch (WebsocketException e) {
+                e.printStackTrace();
+            }
+        });
     }
 
     @Override
